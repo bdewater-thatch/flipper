@@ -41,6 +41,14 @@ module Flipper
         Adapters::Strict::NotFound.name => "flag_not_found".freeze,
       }.freeze
 
+      # Evaluations are INFO, including those that return false. Evaluations
+      # that raised are ERROR.
+      # https://opentelemetry.io/docs/specs/otel/logs/data-model/#error-semantics
+      INFO_SEVERITY_NUMBER = ::OpenTelemetry::Logs::SeverityNumber::SEVERITY_NUMBER_INFO
+      INFO_SEVERITY_TEXT = "INFO".freeze
+      ERROR_SEVERITY_NUMBER = ::OpenTelemetry::Logs::SeverityNumber::SEVERITY_NUMBER_ERROR
+      ERROR_SEVERITY_TEXT = "ERROR".freeze
+
       # Public: Initializes a new emitter.
       #
       # logger_provider - The OpenTelemetry logger provider to emit events to
@@ -60,7 +68,20 @@ module Flipper
         return unless name == Feature::InstrumentationName
         return unless payload[:operation] == :enabled?
 
-        @logger.on_emit(event_name: EVENT_NAME, attributes: attributes(payload))
+        if payload[:exception]
+          severity_number = ERROR_SEVERITY_NUMBER
+          severity_text = ERROR_SEVERITY_TEXT
+        else
+          severity_number = INFO_SEVERITY_NUMBER
+          severity_text = INFO_SEVERITY_TEXT
+        end
+
+        @logger.on_emit(
+          event_name: EVENT_NAME,
+          severity_number: severity_number,
+          severity_text: severity_text,
+          attributes: attributes(payload)
+        )
       rescue StandardError => e
         ::OpenTelemetry.handle_error(exception: e, message: "Flipper failed to emit #{EVENT_NAME} event")
       end

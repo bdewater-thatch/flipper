@@ -126,5 +126,7 @@ RSpec.describe Flipper::Instrumenters::OpenTelemetry do
       "feature_flag.result.reason" => "error",
     )
     expect(emitted_log_records.first.attributes).not_to have_key("feature_flag.result.value")
+    expect(emitted_log_records.first.severity_number).to eq(17)
+    expect(emitted_log_records.first.severity_text).to eq("ERROR")
   end
 end

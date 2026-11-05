@@ -38,6 +38,8 @@ RSpec.describe Flipper::Instrumentation::OpenTelemetryEmitter do
 
     expect(log_record.event_name).to eq("feature_flag.evaluation")
     expect(log_record.body).to be_nil
+    expect(log_record.severity_number).to eq(OpenTelemetry::Logs::SeverityNumber::SEVERITY_NUMBER_INFO)
+    expect(log_record.severity_text).to eq("INFO")
     expect(log_record.instrumentation_scope.name).to eq("flipper")
     expect(log_record.instrumentation_scope.version).to eq(Flipper::VERSION)
     expect(attributes).to eq(
@@ -54,6 +56,22 @@ RSpec.describe Flipper::Instrumentation::OpenTelemetryEmitter do
 
     expect(attributes["feature_flag.result.value"]).to be(true)
     expect(attributes["feature_flag.result.reason"]).to eq("static")
+  end
+
+  it "uses INFO severity when the feature is enabled" do
+    flipper.enable(:search)
+    check
+
+    expect(log_record.severity_number).to eq(9)
+    expect(log_record.severity_text).to eq("INFO")
+  end
+
+  it "uses INFO severity when the feature is disabled" do
+    check
+
+    expect(attributes["feature_flag.result.value"]).to be(false)
+    expect(log_record.severity_number).to eq(9)
+    expect(log_record.severity_text).to eq("INFO")
   end
 
   it "uses targeting_match reason for actor gate" do
@@ -121,6 +139,8 @@ RSpec.describe Flipper::Instrumentation::OpenTelemetryEmitter do
       "feature_flag.error.message" => "boom",
       "feature_flag.result.reason" => "error",
     )
+    expect(log_record.severity_number).to eq(17)
+    expect(log_record.severity_text).to eq("ERROR")
   end
 
   it "reports flag_not_found for strict adapter errors" do
@@ -134,6 +154,8 @@ RSpec.describe Flipper::Instrumentation::OpenTelemetryEmitter do
       "feature_flag.error.message" => error.message,
       "feature_flag.result.reason" => "error",
     )
+    expect(log_record.severity_number).to eq(17)
+    expect(log_record.severity_text).to eq("ERROR")
   end
 
   it "does not include context id by default" do
