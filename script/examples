@@ -9,6 +9,8 @@ for example in examples/**/*.rb; do
   echo $example | grep -q "setup" && continue;
   # Skip examples that have cloud in name
   echo $example | grep -q "cloud" && continue;
+  # Skip OpenTelemetry examples since the gems require Ruby 3.3+
+  echo $example | grep -q "open_telemetry" && continue;
 
   # Skip examples with a loop for now
   if ! grep -q "loop do" "$example"; then

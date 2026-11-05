@@ -23,6 +23,7 @@ module Flipper
         preload: ENV.fetch('FLIPPER_PRELOAD', 'true').casecmp('true').zero?,
         instrumenter: ENV.fetch('FLIPPER_INSTRUMENTER', 'ActiveSupport::Notifications').constantize,
         log: ENV.fetch('FLIPPER_LOG', 'true').casecmp('true').zero?,
+        open_telemetry: ENV.fetch('FLIPPER_OPEN_TELEMETRY', 'false').casecmp('true').zero?,
         cloud_path: "_flipper",
         strict: default_strict_value,
         actor_limit: ENV["FLIPPER_ACTOR_LIMIT"]&.to_i || 100,
@@ -63,6 +64,22 @@ module Flipper
 
       if flipper.log && flipper.instrumenter == ActiveSupport::Notifications
         require "flipper/instrumentation/log_subscriber"
+      end
+    end
+
+    initializer "flipper.open_telemetry", after: :load_config_initializers do |app|
+      flipper = app.config.flipper
+
+      if flipper.open_telemetry && flipper.instrumenter == ActiveSupport::Notifications
+        begin
+          require "flipper/instrumentation/open_telemetry_subscriber"
+        rescue LoadError => e
+          raise LoadError, "config.flipper.open_telemetry requires the opentelemetry-logs-sdk gem " \
+                           "(>= 0.8.0, Ruby 3.3+). Add it to your Gemfile. (#{e.message})"
+        end
+
+        options = flipper.open_telemetry.is_a?(Hash) ? flipper.open_telemetry.symbolize_keys : {}
+        Flipper::Instrumentation::OpenTelemetrySubscriber.subscribe(**options)
       end
     end
 

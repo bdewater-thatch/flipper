@@ -388,6 +388,82 @@ RSpec.describe Flipper::Engine do
     end
   end
 
+  describe "config.open_telemetry" do
+    let(:subscriber_path) { "flipper/instrumentation/open_telemetry_subscriber" }
+
+    it "defaults to false" do
+      allow(Flipper::Engine.instance).to receive(:require).and_call_original
+      expect(Flipper::Engine.instance).to receive(:require).with(subscriber_path).never
+      subject
+      expect(config.open_telemetry).to be(false)
+    end
+
+    it "raises a helpful error when the OpenTelemetry gems are missing" do
+      initializer { config.open_telemetry = true }
+      allow(Flipper::Engine.instance).to receive(:require).and_call_original
+      allow(Flipper::Engine.instance).to receive(:require).with(subscriber_path)
+        .and_raise(LoadError, "cannot load such file -- opentelemetry-logs-api")
+
+      expect { subject }.to raise_error(LoadError, /requires the opentelemetry-logs-sdk gem.*cannot load such file/)
+    end
+
+    context "with opentelemetry-logs-sdk" do
+      let(:subscriber) { Flipper::Instrumentation::OpenTelemetrySubscriber }
+
+      before do
+        begin
+          require "opentelemetry-logs-sdk"
+        rescue LoadError
+          skip "opentelemetry-logs-sdk requires Ruby 3.3+"
+        end
+
+        require subscriber_path
+        subscriber.unsubscribe
+      end
+
+      after { subscriber.unsubscribe }
+
+      it "does not subscribe by default" do
+        subject
+        expect(subscriber).not_to be_subscribed
+      end
+
+      it "can be enabled from FLIPPER_OPEN_TELEMETRY env" do
+        ENV["FLIPPER_OPEN_TELEMETRY"] = "true"
+        subject
+        expect(config.open_telemetry).to be(true)
+        expect(subscriber).to be_subscribed
+      end
+
+      it "can be enabled from an initializer" do
+        initializer { config.open_telemetry = true }
+        subject
+        expect(subscriber).to be_subscribed
+      end
+
+      it "passes options from an initializer" do
+        initializer { config.open_telemetry = { include_context_id: true } }
+        expect(subscriber).to receive(:subscribe).with(include_context_id: true)
+        subject
+      end
+
+      it "passes options with string keys from an initializer" do
+        initializer { config.open_telemetry = { "include_context_id" => true } }
+        expect(subscriber).to receive(:subscribe).with(include_context_id: true)
+        subject
+      end
+
+      it "does not subscribe when not instrumenting with ActiveSupport::Notifications" do
+        initializer do
+          config.instrumenter = Flipper::Instrumenters::Noop
+          config.open_telemetry = true
+        end
+        subject
+        expect(subscriber).not_to be_subscribed
+      end
+    end
+  end
+
   # Add app initializer in the same order as config/initializers/*
   def initializer(&block)
     application.initializer 'spec', before: :load_config_initializers do

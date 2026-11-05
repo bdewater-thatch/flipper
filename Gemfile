@@ -37,6 +37,10 @@ gem 'cuprite'
 gem 'puma'
 gem 'warning'
 
+if RUBY_VERSION >= '3.3'
+  gem 'opentelemetry-logs-sdk', '>= 0.8.0'
+end
+
 group(:guard) do
   gem 'guard'
   gem 'guard-rspec'
